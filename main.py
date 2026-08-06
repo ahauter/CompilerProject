@@ -139,10 +139,94 @@ def interp_Lint(p):
                 interp_stmt(s)
 
 
+def pe_neg(r):
+    match r:
+        case Constant(value=n):
+            return Constant(-1 * n)
+        case _:
+            return UnOp(USub(), r)
+
+
+def pe_add(r1, r2):
+    match (r1, r2):
+        case Constant(value=r1), Constant(value=r2):
+            return Constant(r1 + r2)
+        case _:
+            return BinOp(r1, Add(), r2)
+
+
+def pe_sub(r1, r2):
+    match (r1, r2):
+        case Constant(value=r1), Constant(value=r2):
+            return Constant(r1 - r2)
+        case _:
+            return BinOp(r1, Sub(), r2)
+
+
+def pe_mul(r1, r2):
+    match (r1, r2):
+        case Constant(value=r1), Constant(value=r2):
+            return Constant(r1 * r2)
+        case _:
+            return BinOp(r1, Mul(), r2)
+
+
+def pe_div(r1, r2):
+    match (r1, r2):
+        case Constant(value=r1), Constant(value=r2):
+            return Constant(r1 / r2)
+        case _:
+            return BinOp(r1, Div(), r2)
+
+
+def pe_exp(e):
+    match e:
+        case BinOp(left=l1, op=Add(), right=r1):
+            return pe_add(pe_exp(l1), pe_exp(r1))
+        case BinOp(left=l1, op=Sub(), right=r1):
+            return pe_sub(pe_exp(l1), pe_exp(r1))
+        case BinOp(left=l1, op=Mul(), right=r1):
+            return pe_mul(pe_exp(l1), pe_exp(r1))
+        case BinOp(left=l1, op=Div(), right=r1):
+            return pe_div(pe_exp(l1), pe_exp(r1))
+        case UnOp(op=USub(), right=r):
+            return pe_neg(pe_exp(r))
+        case Constant(value=_):
+            return e
+        case Call(func=Name(id="input_int"), args=[]):
+            return e
+        case _:
+            print("OOPS")
+
+
+def pe_stmt(s):
+    match s:
+        case Expr(expr=Call(func=Name(id="print"), args=[Expr(expr=e)])):
+            return Expr(expr=Call(func=Name(id="print"), args=[Expr(pe_exp(e))]))
+        case Expr(expr=value):
+            return Expr(expr=pe_exp(value))
+
+
+def pe_P_int(p):
+    match p:
+        case Module(body=body):
+            new_body = [pe_stmt(s) for s in body]
+            return Module(new_body)
+
+
 ast1_1 = BinOp(Call(Name("input_int"), []), Add(), UnOp(USub(), Constant(8)))
 read = Call(Name("input_int"), [])
-print(is_Lint(Module([Expr(ast1_1)])))
-print(is_Lint(Module([
-    Expr(BinOp(read, Sub(), UnOp(Add(), Constant(8))))
-])))
-interp_Lint(Module([Expr(Call(Name("print"), [Expr(ast1_1)]))]))
+prog1 = Expr(ast1_1)
+prog2 = Expr(BinOp(read, Sub(), UnOp(Add(), Constant(8))))
+
+prog3 = Module([Expr(Call(Name("print"), [Expr(ast1_1)]))])
+def print_prog(e): return Module([Expr(Call(Name("print"), [e]))])
+
+
+print(is_Lint(prog1))
+print(is_Lint(prog2))
+pe_prog1 = pe_P_int(prog3)
+# pe_prog2 = pe_P_int(print_prog(prog2))
+interp_Lint(print_prog(prog1))
+# print(pe_prog1.body[0].expr.args[0].expr)
+interp_Lint(pe_prog1)
