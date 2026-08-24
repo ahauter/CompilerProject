@@ -241,19 +241,20 @@ def pe_P_int(p):
             return Module(new_body)
 
 
-ast1_1 = BinOp(Call(Name("input_int"), []), Add(), UnOp(USub(), Constant(8)))
-read = Call(Name("input_int"), [])
-prog1 = Expr(ast1_1)
-prog2 = Expr(BinOp(read, Sub(), UnOp(Add(), Constant(8))))
+if __name__ == "__main__":
+    ast1_1 = BinOp(Call(Name("input_int"), []),
+                   Add(), UnOp(USub(), Constant(8)))
+    read = Call(Name("input_int"), [])
+    prog1 = Expr(ast1_1)
+    prog2 = Expr(BinOp(read, Sub(), UnOp(Add(), Constant(8))))
 
-prog3 = Module([Expr(Call(Name("print"), [Expr(ast1_1)]))])
-def print_prog(e): return Module([Expr(Call(Name("print"), [e]))])
+    prog3 = Module([Expr(Call(Name("print"), [Expr(ast1_1)]))])
+    def print_prog(e): return Module([Expr(Call(Name("print"), [e]))])
 
-
-print(is_Lint(Module([prog1])))
-print(is_Lint(prog3))
-pe_prog1 = pe_P_int(prog3)
-# pe_prog2 = pe_P_int(print_prog(prog2))
-interp_Lint(print_prog(prog1))
-# print(pe_prog1.body[0].expr.args[0].expr)
-interp_Lint(pe_prog1)
+    print(is_Lint(Module([prog1])))
+    print(is_Lint(prog3))
+    pe_prog1 = pe_P_int(prog3)
+    # pe_prog2 = pe_P_int(print_prog(prog2))
+    interp_Lint(print_prog(prog1))
+    # print(pe_prog1.body[0].expr.args[0].expr)
+    interp_Lint(pe_prog1)

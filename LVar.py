@@ -83,7 +83,83 @@ class Expr:
         return f"{self.expr}"
 
 
-class InterpLint:
+class Assignment:
+    def __init__(self, name, expr):
+        self.name = name
+        self.expr = expr
+
+    def __str__(self):
+        return f"{self.name.id} = {self.expr}"
+
+
+class Lint:
+    def pe_neg(self, r):
+        match r:
+            case Constant(value=n):
+                return Constant(-1 * n)
+            case _:
+                return UnOp(USub(), r)
+
+    def pe_add(self, r1, r2):
+        match (r1, r2):
+            case Constant(value=r1), Constant(value=r2):
+                return Constant(r1 + r2)
+            case _:
+                return BinOp(r1, Add(), r2)
+
+    def pe_sub(self, r1, r2):
+        match (r1, r2):
+            case Constant(value=r1), Constant(value=r2):
+                return Constant(r1 - r2)
+            case _:
+                return BinOp(r1, Sub(), r2)
+
+    def pe_mul(self, r1, r2):
+        match (r1, r2):
+            case Constant(value=r1), Constant(value=r2):
+                return Constant(r1 * r2)
+            case _:
+                return BinOp(r1, Mul(), r2)
+
+    def pe_div(self, r1, r2):
+        match (r1, r2):
+            case Constant(value=r1), Constant(value=r2):
+                return Constant(r1 / r2)
+            case _:
+                return BinOp(r1, Div(), r2)
+
+    def pe_exp(self, e):
+        match e:
+            case BinOp(left=l1, op=Add(), right=r1):
+                return self.pe_add(self.pe_exp(l1), self.pe_exp(r1))
+            case BinOp(left=l1, op=Sub(), right=r1):
+                return self.pe_sub(self.pe_exp(l1), self.pe_exp(r1))
+            case BinOp(left=l1, op=Mul(), right=r1):
+                return self.pe_mul(self.pe_exp(l1), self.pe_exp(r1))
+            case BinOp(left=l1, op=Div(), right=r1):
+                return self.pe_div(self.pe_exp(l1), self.pe_exp(r1))
+            case UnOp(op=USub(), right=r):
+                return self.pe_neg(self.pe_exp(r))
+            case Constant(value=_):
+                return e
+            case Call(func=Name(id="input_int"), args=[]):
+                return e
+            case _:
+                print("OOPS")
+
+    def pe_stmt(self, s):
+        match s:
+            case Expr(expr=Call(func=Name(id="print"), args=[Expr(expr=e)])):
+                return Expr(expr=Call(func=Name(id="print"), args=[Expr(self.pe_exp(e))]))
+            case Expr(expr=value):
+                return Expr(expr=self.pe_exp(value))
+
+    def pe(self, p):
+        match p:
+            case Module(body=body):
+                new_body = [self.pe_stmt(s) for s in body]
+                return Module(new_body)
+
     def interp(self, p):
         match p:
             case Module(body=body):
@@ -123,19 +199,7 @@ class InterpLint:
                 return int(input())
 
 
-env = {}
-
-
-class Assignment:
-    def __init__(self, name, expr):
-        self.name = name
-        self.expr = expr
-
-    def __str__(self):
-        return f"{self.name.id} = {self.expr}"
-
-
-class InterpLVar(InterpLint):
+class LVar(Lint):
     def __init__(self):
         self.env = {}
 
@@ -202,81 +266,6 @@ def is_Lint(p):
             return False
 
 
-def pe_neg(r):
-    match r:
-        case Constant(value=n):
-            return Constant(-1 * n)
-        case _:
-            return UnOp(USub(), r)
-
-
-def pe_add(r1, r2):
-    match (r1, r2):
-        case Constant(value=r1), Constant(value=r2):
-            return Constant(r1 + r2)
-        case _:
-            return BinOp(r1, Add(), r2)
-
-
-def pe_sub(r1, r2):
-    match (r1, r2):
-        case Constant(value=r1), Constant(value=r2):
-            return Constant(r1 - r2)
-        case _:
-            return BinOp(r1, Sub(), r2)
-
-
-def pe_mul(r1, r2):
-    match (r1, r2):
-        case Constant(value=r1), Constant(value=r2):
-            return Constant(r1 * r2)
-        case _:
-            return BinOp(r1, Mul(), r2)
-
-
-def pe_div(r1, r2):
-    match (r1, r2):
-        case Constant(value=r1), Constant(value=r2):
-            return Constant(r1 / r2)
-        case _:
-            return BinOp(r1, Div(), r2)
-
-
-def pe_exp(e):
-    match e:
-        case BinOp(left=l1, op=Add(), right=r1):
-            return pe_add(pe_exp(l1), pe_exp(r1))
-        case BinOp(left=l1, op=Sub(), right=r1):
-            return pe_sub(pe_exp(l1), pe_exp(r1))
-        case BinOp(left=l1, op=Mul(), right=r1):
-            return pe_mul(pe_exp(l1), pe_exp(r1))
-        case BinOp(left=l1, op=Div(), right=r1):
-            return pe_div(pe_exp(l1), pe_exp(r1))
-        case UnOp(op=USub(), right=r):
-            return pe_neg(pe_exp(r))
-        case Constant(value=_):
-            return e
-        case Call(func=Name(id="input_int"), args=[]):
-            return e
-        case _:
-            print("OOPS")
-
-
-def pe_stmt(s):
-    match s:
-        case Expr(expr=Call(func=Name(id="print"), args=[Expr(expr=e)])):
-            return Expr(expr=Call(func=Name(id="print"), args=[Expr(pe_exp(e))]))
-        case Expr(expr=value):
-            return Expr(expr=pe_exp(value))
-
-
-def pe_P_int(p):
-    match p:
-        case Module(body=body):
-            new_body = [pe_stmt(s) for s in body]
-            return Module(new_body)
-
-
 ast1_1 = Assignment(
     Name(id="variable1"),
     Expr(BinOp(Call(Name("input_int"), []), Add(), UnOp(USub(), Constant(8)))),
@@ -288,5 +277,5 @@ prog2 = Expr(BinOp(read, Sub(), UnOp(Add(), Constant(8))))
 prog3 = Module([ast1_1, Expr(Call(Name("print"), [Expr(Name("variable1"))]))])
 
 print(is_Lint(prog3))
-comp = InterpLVar()
+comp = LVar()
 comp.interp(prog3)
