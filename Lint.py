@@ -2,13 +2,16 @@ class Constant:
     def __init__(self, value):
         self.value = value
 
-    def eval(self):
-        return self.value
+    def __str__(self):
+        return f"{self.value}"
 
 
 class Module:
     def __init__(self, body):
         self.body = body
+
+    def __str__(self):
+        return f"{self.body}"
 
 
 class BinOp:
@@ -17,31 +20,42 @@ class BinOp:
         self.right = right
         self.op = op
 
+    def __str__(self):
+        return f"{self.left}{self.op}{self.right}"
+
 
 class UnOp:
     def __init__(self, op, right):
         self.op = op
         self.right = right
 
+    def __str__(self):
+        return f"{self.op}{self.right}"
+
 
 class USub:
-    pass
+    def __str__(self):
+        return f"-"
 
 
 class Add:
-    pass
+    def __str__(self):
+        return f"+"
 
 
 class Sub:
-    pass
+    def __str__(self):
+        return f"-"
 
 
 class Mul:
-    pass
+    def __str__(self):
+        return f"*"
 
 
 class Div:
-    pass
+    def __str__(self):
+        return f"/"
 
 
 class Call:
@@ -49,15 +63,24 @@ class Call:
         self.func = func
         self.args = args
 
+    def __str__(self):
+        return f"{self.func}({self.args})"
+
 
 class Name:
     def __init__(self, id):
         self.id = id
 
+    def __str__(self):
+        return f"{self.id}"
+
 
 class Expr:
     def __init__(self, expr):
         self.expr = expr
+
+    def __str__(self):
+        return f"{self.expr}"
 
 
 def is_exp(line: str):
@@ -77,16 +100,19 @@ def is_exp(line: str):
         case Call(func=Name(id='input_int'), args=[]):
             return True
         case _:
+            print("Expression not recognized")
+            print(line)
             return False
 
 
 def is_stmt(s):
     match s:
-        case Expr(expr=Call(func=Name('print'), args=[e])):
+        case Expr(expr=Call(func=Name(id='print'), args=[Expr(expr=e)])):
             return is_exp(e)
         case Expr(expr=e):
             return is_exp(e)
         case _:
+            print("Statement not recognized")
             return False
 
 
@@ -95,6 +121,7 @@ def is_Lint(p):
         case Module(body=body):
             return all([is_stmt(s) for s in body])
         case _:
+            print("Module not recognized")
             return False
 
 
@@ -223,8 +250,8 @@ prog3 = Module([Expr(Call(Name("print"), [Expr(ast1_1)]))])
 def print_prog(e): return Module([Expr(Call(Name("print"), [e]))])
 
 
-print(is_Lint(prog1))
-print(is_Lint(prog2))
+print(is_Lint(Module([prog1])))
+print(is_Lint(prog3))
 pe_prog1 = pe_P_int(prog3)
 # pe_prog2 = pe_P_int(print_prog(prog2))
 interp_Lint(print_prog(prog1))
