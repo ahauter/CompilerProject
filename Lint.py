@@ -83,162 +83,150 @@ class Expr:
         return f"{self.expr}"
 
 
-def is_exp(line: str):
-    match line:
-        case BinOp(left=child1, op=Add(), right=child2):
-            return is_exp(child1) and is_exp(child2)
-        case BinOp(left=child1, op=Sub(), right=child2):
-            return is_exp(child1) and is_exp(child2)
-        case BinOp(left=child1, op=Mul(), right=child2):
-            return is_exp(child1) and is_exp(child2)
-        case BinOp(left=child1, op=Div(), right=child2):
-            return is_exp(child1) and is_exp(child2)
-        case Constant(value=value):
-            return True
-        case UnOp(op=USub(), right=const):
-            return is_exp(const)
-        case Call(func=Name(id='input_int'), args=[]):
-            return True
-        case _:
-            print("Expression not recognized")
-            print(line)
-            return False
+class LInt():
+    def is_exp(self, line: str):
+        match line:
+            case BinOp(left=child1, op=Add(), right=child2):
+                return self.is_exp(child1) and self.is_exp(child2)
+            case BinOp(left=child1, op=Sub(), right=child2):
+                return self.is_exp(child1) and self.is_exp(child2)
+            case BinOp(left=child1, op=Mul(), right=child2):
+                return self.is_exp(child1) and self.is_exp(child2)
+            case BinOp(left=child1, op=Div(), right=child2):
+                return self.is_exp(child1) and self.is_exp(child2)
+            case Constant(value=value):
+                return True
+            case UnOp(op=USub(), right=const):
+                return self.is_exp(const)
+            case Call(func=Name(id='input_int'), args=[]):
+                return True
+            case _:
+                print("Expression not recognized")
+                print(line)
+                return False
 
+    def is_stmt(self, s):
+        match s:
+            case Expr(expr=Call(func=Name(id='print'), args=[Expr(expr=e)])):
+                return self.is_exp(e)
+            case Expr(expr=e):
+                return self.is_exp(e)
+            case _:
+                print("Statement not recognized")
+                return False
 
-def is_stmt(s):
-    match s:
-        case Expr(expr=Call(func=Name(id='print'), args=[Expr(expr=e)])):
-            return is_exp(e)
-        case Expr(expr=e):
-            return is_exp(e)
-        case _:
-            print("Statement not recognized")
-            return False
+    def is_Lint(self, p):
+        match p:
+            case Module(body=body):
+                return all([self.is_stmt(s) for s in body])
+            case _:
+                print("Module not recognized")
+                return False
 
+    def interp_exp(self, e):
+        match e:
+            case BinOp(left=child1, op=Add(), right=child2):
+                l = self.interp_exp(child1)
+                r = self.interp_exp(child2)
+                return l + r
+            case BinOp(left=child1, op=Sub(), right=child2):
+                l = self.interp_exp(child1)
+                r = self.interp_exp(child2)
+                return l - r
+            case BinOp(left=child1, op=Mul(), right=child2):
+                l = self.interp_exp(child1)
+                r = self.interp_exp(child2)
+                return l * r
+            case BinOp(left=child1, op=Div(), right=child2):
+                l = self.interp_exp(child1)
+                r = self.interp_exp(child2)
+                return l / r
+            case Constant(value=value):
+                return value
+            case UnOp(op=USub(), right=const):
+                return -1 * self.interp_exp(const)
+            case Call(func=Name(id='input_int'), args=[]):
+                return int(input())
 
-def is_Lint(p):
-    match p:
-        case Module(body=body):
-            return all([is_stmt(s) for s in body])
-        case _:
-            print("Module not recognized")
-            return False
+    def interp_stmt(self, s):
+        match s:
+            case Expr(expr=Call(func=Name(id='print'), args=[Expr(expr=e)])):
+                print(self.interp_exp(e))
+            case Expr(expr=e):
+                self.interp_exp(e)
 
+    def interp(self, p):
+        match p:
+            case Module(body=body):
+                for s in body:
+                    self.interp_stmt(s)
 
-def interp_exp(e):
-    match e:
-        case BinOp(left=child1, op=Add(), right=child2):
-            l = interp_exp(child1)
-            r = interp_exp(child2)
-            return l + r
-        case BinOp(left=child1, op=Sub(), right=child2):
-            l = interp_exp(child1)
-            r = interp_exp(child2)
-            return l - r
-        case BinOp(left=child1, op=Mul(), right=child2):
-            l = interp_exp(child1)
-            r = interp_exp(child2)
-            return l * r
-        case BinOp(left=child1, op=Div(), right=child2):
-            l = interp_exp(child1)
-            r = interp_exp(child2)
-            return l / r
-        case Constant(value=value):
-            return value
-        case UnOp(op=USub(), right=const):
-            return -1 * interp_exp(const)
-        case Call(func=Name(id='input_int'), args=[]):
-            return int(input())
+    def pe_neg(self, r):
+        match r:
+            case Constant(value=n):
+                return Constant(-1 * n)
+            case _:
+                return UnOp(USub(), r)
 
+    def pe_add(self, r1, r2):
+        match (r1, r2):
+            case Constant(value=r1), Constant(value=r2):
+                return Constant(r1 + r2)
+            case _:
+                return BinOp(r1, Add(), r2)
 
-def interp_stmt(s):
-    match s:
-        case Expr(expr=Call(func=Name(id='print'), args=[Expr(expr=e)])):
-            print(interp_exp(e))
-        case Expr(expr=e):
-            interp_exp(e)
+    def pe_sub(self, r1, r2):
+        match (r1, r2):
+            case Constant(value=r1), Constant(value=r2):
+                return Constant(r1 - r2)
+            case _:
+                return BinOp(r1, Sub(), r2)
 
+    def pe_mul(self, r1, r2):
+        match (r1, r2):
+            case Constant(value=r1), Constant(value=r2):
+                return Constant(r1 * r2)
+            case _:
+                return BinOp(r1, Mul(), r2)
 
-def interp_Lint(p):
-    match p:
-        case Module(body=body):
-            for s in body:
-                interp_stmt(s)
+    def pe_div(self, r1, r2):
+        match (r1, r2):
+            case Constant(value=r1), Constant(value=r2):
+                return Constant(r1 / r2)
+            case _:
+                return BinOp(r1, Div(), r2)
 
+    def pe_exp(self, e):
+        match e:
+            case BinOp(left=l1, op=Add(), right=r1):
+                return self.pe_add(self.pe_exp(l1), self.pe_exp(r1))
+            case BinOp(left=l1, op=Sub(), right=r1):
+                return self.pe_sub(self.pe_exp(l1), self.pe_exp(r1))
+            case BinOp(left=l1, op=Mul(), right=r1):
+                return self.pe_mul(self.pe_exp(l1), self.pe_exp(r1))
+            case BinOp(left=l1, op=Div(), right=r1):
+                return self.pe_div(self.pe_exp(l1), self.pe_exp(r1))
+            case UnOp(op=USub(), right=r):
+                return self.pe_neg(self.pe_exp(r))
+            case Constant(value=_):
+                return e
+            case Call(func=Name(id="input_int"), args=[]):
+                return e
+            case _:
+                print("OOPS")
 
-def pe_neg(r):
-    match r:
-        case Constant(value=n):
-            return Constant(-1 * n)
-        case _:
-            return UnOp(USub(), r)
+    def pe_stmt(self, s):
+        match s:
+            case Expr(expr=Call(func=Name(id="print"), args=[Expr(expr=e)])):
+                return Expr(expr=Call(func=Name(id="print"), args=[Expr(self.pe_exp(e))]))
+            case Expr(expr=value):
+                return Expr(expr=self.pe_exp(value))
 
-
-def pe_add(r1, r2):
-    match (r1, r2):
-        case Constant(value=r1), Constant(value=r2):
-            return Constant(r1 + r2)
-        case _:
-            return BinOp(r1, Add(), r2)
-
-
-def pe_sub(r1, r2):
-    match (r1, r2):
-        case Constant(value=r1), Constant(value=r2):
-            return Constant(r1 - r2)
-        case _:
-            return BinOp(r1, Sub(), r2)
-
-
-def pe_mul(r1, r2):
-    match (r1, r2):
-        case Constant(value=r1), Constant(value=r2):
-            return Constant(r1 * r2)
-        case _:
-            return BinOp(r1, Mul(), r2)
-
-
-def pe_div(r1, r2):
-    match (r1, r2):
-        case Constant(value=r1), Constant(value=r2):
-            return Constant(r1 / r2)
-        case _:
-            return BinOp(r1, Div(), r2)
-
-
-def pe_exp(e):
-    match e:
-        case BinOp(left=l1, op=Add(), right=r1):
-            return pe_add(pe_exp(l1), pe_exp(r1))
-        case BinOp(left=l1, op=Sub(), right=r1):
-            return pe_sub(pe_exp(l1), pe_exp(r1))
-        case BinOp(left=l1, op=Mul(), right=r1):
-            return pe_mul(pe_exp(l1), pe_exp(r1))
-        case BinOp(left=l1, op=Div(), right=r1):
-            return pe_div(pe_exp(l1), pe_exp(r1))
-        case UnOp(op=USub(), right=r):
-            return pe_neg(pe_exp(r))
-        case Constant(value=_):
-            return e
-        case Call(func=Name(id="input_int"), args=[]):
-            return e
-        case _:
-            print("OOPS")
-
-
-def pe_stmt(s):
-    match s:
-        case Expr(expr=Call(func=Name(id="print"), args=[Expr(expr=e)])):
-            return Expr(expr=Call(func=Name(id="print"), args=[Expr(pe_exp(e))]))
-        case Expr(expr=value):
-            return Expr(expr=pe_exp(value))
-
-
-def pe_P_int(p):
-    match p:
-        case Module(body=body):
-            new_body = [pe_stmt(s) for s in body]
-            return Module(new_body)
+    def pe_P_int(self, p):
+        match p:
+            case Module(body=body):
+                new_body = [self.pe_stmt(s) for s in body]
+                return Module(new_body)
 
 
 if __name__ == "__main__":
@@ -251,10 +239,11 @@ if __name__ == "__main__":
     prog3 = Module([Expr(Call(Name("print"), [Expr(ast1_1)]))])
     def print_prog(e): return Module([Expr(Call(Name("print"), [e]))])
 
-    print(is_Lint(Module([prog1])))
-    print(is_Lint(prog3))
-    pe_prog1 = pe_P_int(prog3)
+    interp = LInt()
+    print(interp.is_Lint(Module([prog1])))
+    print(interp.is_Lint(prog3))
+    pe_prog1 = interp.pe_P_int(prog3)
     # pe_prog2 = pe_P_int(print_prog(prog2))
-    interp_Lint(print_prog(prog1))
+    interp.interp(print_prog(prog1))
     # print(pe_prog1.body[0].expr.args[0].expr)
-    interp_Lint(pe_prog1)
+    interp.interp(pe_prog1)
