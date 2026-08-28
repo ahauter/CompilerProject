@@ -142,11 +142,6 @@ class LVar(LInt):
                 instrs.extend(new_instrs)
                 instrs.append(AddQ(arg1, arg2))
                 return (instrs, arg2)
-            case BinOp(left=Constant(value=const), op=Sub(), right=child2):
-                new_instrs, arg2 = self.select_instructions_exp(child2)
-                instrs.extend(new_instrs)
-                instrs.append(SubQ(Immediate(const), arg2))
-                return (instrs, arg2)
             case BinOp(left=child2, op=Sub(), right=Constant(value=const)):
                 new_instrs, arg2 = self.select_instructions_exp(child2)
                 instrs.extend(new_instrs)
@@ -269,3 +264,17 @@ if __name__ == "__main__":
         ]))
     ])
     run_test("Test 3: print(-(1 + 2))", test3)
+
+    # Test 4: subtraction (Sub)
+    test4 = Module([
+        Assignment(Name("x"), Expr(BinOp(Constant(10), Sub(), Constant(3))))
+    ])
+    run_test("Test 4: x = 10 - 3", test4)
+
+    # Test 5: edge case - simple unary negation of a constant
+    test5 = Module([
+        Expr(Call(Name("print"), [
+            Expr(UnOp(USub(), Constant(42)))
+        ]))
+    ])
+    run_test("Test 5: print(-42)", test5)
