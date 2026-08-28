@@ -5,13 +5,17 @@ class Constant:
     def __str__(self):
         return f"{self.value}"
 
+    __repr__ = __str__
+
 
 class Module:
     def __init__(self, body):
         self.body = body
 
     def __str__(self):
-        return f"{self.body}"
+        return "\n".join(str(s) for s in self.body)
+
+    __repr__ = __str__
 
 
 class BinOp:
@@ -21,7 +25,9 @@ class BinOp:
         self.op = op
 
     def __str__(self):
-        return f"{self.left}{self.op}{self.right}"
+        return f"({self.left} {self.op} {self.right})"
+
+    __repr__ = __str__
 
 
 class UnOp:
@@ -30,32 +36,44 @@ class UnOp:
         self.right = right
 
     def __str__(self):
-        return f"{self.op}{self.right}"
+        return f"({self.op}{self.right})"
+
+    __repr__ = __str__
 
 
 class USub:
     def __str__(self):
         return f"-"
 
+    __repr__ = __str__
+
 
 class Add:
     def __str__(self):
         return f"+"
+
+    __repr__ = __str__
 
 
 class Sub:
     def __str__(self):
         return f"-"
 
+    __repr__ = __str__
+
 
 class Mul:
     def __str__(self):
         return f"*"
 
+    __repr__ = __str__
+
 
 class Div:
     def __str__(self):
         return f"/"
+
+    __repr__ = __str__
 
 
 class Call:
@@ -64,7 +82,9 @@ class Call:
         self.args = args
 
     def __str__(self):
-        return f"{self.func}({self.args})"
+        return f"{self.func}({', '.join(str(a) for a in self.args)})"
+
+    __repr__ = __str__
 
 
 class Name:
@@ -74,6 +94,8 @@ class Name:
     def __str__(self):
         return f"{self.id}"
 
+    __repr__ = __str__
+
 
 class Expr:
     def __init__(self, expr):
@@ -81,6 +103,8 @@ class Expr:
 
     def __str__(self):
         return f"{self.expr}"
+
+    __repr__ = __str__
 
 
 class LInt():

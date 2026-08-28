@@ -20,7 +20,7 @@ REGISTERS = {
 }
 
 
-class Add:
+class AddQ:
     def __init__(self, arg1, arg2):
         self.arg1 = arg1
         self.arg2 = arg2
@@ -31,7 +31,7 @@ class Add:
     __repr__ = __str__
 
 
-class Sub:
+class SubQ:
     def __init__(self, arg1, arg2):
         self.arg1 = arg1
         self.arg2 = arg2
@@ -42,7 +42,7 @@ class Sub:
     __repr__ = __str__
 
 
-class Neg:
+class NegQ:
     def __init__(self, arg1):
         self.arg1 = arg1
 
@@ -83,13 +83,13 @@ class Pop:
     __repr__ = __str__
 
 
-class Call:
+class CallQ:
     def __init__(self, label, i):
         self.label = label
         self.integer = i
 
     def __str__(self):
-        return f"callq {self.label}"
+        return f"callq {self.label} {self.integer}"
 
     __repr__ = __str__
 
@@ -171,13 +171,13 @@ class X86_int:
 
     def _is_instr(self, instr):
         match instr:
-            case Add(arg1=a, arg2=b):
+            case AddQ(arg1=a, arg2=b):
                 return self._is_arg(a) and self._is_arg(b)
-            case Sub(arg1=a, arg2=b):
+            case SubQ(arg1=a, arg2=b):
                 return self._is_arg(a) and self._is_arg(b)
             case Move(arg1=a, arg2=b):
                 return self._is_arg(a) and self._is_arg(b)
-            case Neg(arg1=a):
+            case NegQ(arg1=a):
                 return self._is_arg(a)
             case Push(arg1=a):
                 return self._is_arg(a)
@@ -185,7 +185,7 @@ class X86_int:
                 return self._is_arg(a)
             case Jump(label=_):
                 return True
-            case Call(label=_, i=_):
+            case CallQ(label=NameQ(id=_), integer=_):
                 return True
             case Ret():
                 return True
@@ -199,7 +199,7 @@ class X86_int:
         return is_valid
 
 
-class Name:
+class NameQ:
     def __init__(self, id):
         self.id = id
 
@@ -212,7 +212,7 @@ class Name:
 class X86_var(X86_int):
     def _is_arg(self, arg):
         match arg:
-            case Name(id=_):
+            case NameQ(id=_):
                 return True
             case _:
                 return super()._is_arg(arg)
@@ -230,75 +230,85 @@ if __name__ == '__main__':
 
     prog1_int = Program([
         Move(Immediate(5), Register("rax")),
-        Add(Immediate(3), Register("rax")),
+        AddQ(Immediate(3), Register("rax")),
         Ret()
     ])
-    run_test("x86_int Test 1: movq $5, %rax; addq $3, %rax; retq", prog1_int, x86_int_validator)
+    run_test("x86_int Test 1: movq $5, %rax; addq $3, %rax; retq",
+             prog1_int, x86_int_validator)
 
     prog2_int = Program([
         Push(Register("rbp")),
         Pop(Register("rbp")),
         Ret()
     ])
-    run_test("x86_int Test 2: pushq %rbp; popq %rbp; retq", prog2_int, x86_int_validator)
+    run_test("x86_int Test 2: pushq %rbp; popq %rbp; retq",
+             prog2_int, x86_int_validator)
 
     prog3_int = Program([
         Move(Immediate(10), Register("rax")),
-        Neg(Register("rax")),
+        NegQ(Register("rax")),
         Ret()
     ])
-    run_test("x86_int Test 3: movq $10, %rax; negq %rax; retq", prog3_int, x86_int_validator)
+    run_test("x86_int Test 3: movq $10, %rax; negq %rax; retq",
+             prog3_int, x86_int_validator)
 
     prog4_int = Program([
         Move(Immediate(10), Register("rax")),
-        Sub(Immediate(3), Register("rax")),
+        SubQ(Immediate(3), Register("rax")),
         Ret()
     ])
-    run_test("x86_int Test 4: movq $10, %rax; subq $3, %rax; retq", prog4_int, x86_int_validator)
+    run_test("x86_int Test 4: movq $10, %rax; subq $3, %rax; retq",
+             prog4_int, x86_int_validator)
 
     prog5_int = Program([
         Move(Immediate(42), Deref(Register("rbp"), -8)),
         Ret()
     ])
-    run_test("x86_int Test 5: movq $42, -8(%rbp); retq", prog5_int, x86_int_validator)
+    run_test("x86_int Test 5: movq $42, -8(%rbp); retq",
+             prog5_int, x86_int_validator)
 
     # ---- x86_var tests (with variables) ----
     x86_var_validator = X86_var()
 
     prog1_var = Program([
-        Move(Immediate(5), Name("x")),
-        Move(Name("x"), Register("rax")),
+        Move(Immediate(5), NameQ("x")),
+        Move(NameQ("x"), Register("rax")),
         Ret()
     ])
-    run_test("x86_var Test 1: movq $5, x; movq x, %rax; retq", prog1_var, x86_var_validator)
+    run_test("x86_var Test 1: movq $5, x; movq x, %rax; retq",
+             prog1_var, x86_var_validator)
 
     prog2_var = Program([
-        Move(Immediate(10), Name("x")),
-        Add(Immediate(5), Name("x")),
-        Move(Name("x"), Register("rax")),
+        Move(Immediate(10), NameQ("x")),
+        AddQ(Immediate(5), NameQ("x")),
+        Move(NameQ("x"), Register("rax")),
         Ret()
     ])
-    run_test("x86_var Test 2: movq $10, x; addq $5, x; movq x, %rax; retq", prog2_var, x86_var_validator)
+    run_test("x86_var Test 2: movq $10, x; addq $5, x; movq x, %rax; retq",
+             prog2_var, x86_var_validator)
 
     prog3_var = Program([
-        Move(Immediate(7), Name("x")),
-        Neg(Name("x")),
-        Move(Name("x"), Register("rax")),
+        Move(Immediate(7), NameQ("x")),
+        NegQ(NameQ("x")),
+        Move(NameQ("x"), Register("rax")),
         Ret()
     ])
-    run_test("x86_var Test 3: movq $7, x; negq x; movq x, %rax; retq", prog3_var, x86_var_validator)
+    run_test("x86_var Test 3: movq $7, x; negq x; movq x, %rax; retq",
+             prog3_var, x86_var_validator)
 
     prog4_var = Program([
-        Move(Immediate(1), Name("x")),
-        Add(Name("x"), Register("rax")),
+        Move(Immediate(1), NameQ("x")),
+        AddQ(NameQ("x"), Register("rax")),
         Ret()
     ])
-    run_test("x86_var Test 4: movq $1, x; addq x, %rax; retq", prog4_var, x86_var_validator)
+    run_test("x86_var Test 4: movq $1, x; addq x, %rax; retq",
+             prog4_var, x86_var_validator)
 
     prog5_var = Program([
-        Move(Immediate(20), Name("x")),
-        Sub(Immediate(5), Name("x")),
-        Move(Name("x"), Register("rax")),
+        Move(Immediate(20), NameQ("x")),
+        SubQ(Immediate(5), NameQ("x")),
+        Move(NameQ("x"), Register("rax")),
         Ret()
     ])
-    run_test("x86_var Test 5: movq $20, x; subq $5, x; movq x, %rax; retq", prog5_var, x86_var_validator)
+    run_test("x86_var Test 5: movq $20, x; subq $5, x; movq x, %rax; retq",
+             prog5_var, x86_var_validator)
