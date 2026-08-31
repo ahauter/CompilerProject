@@ -170,7 +170,8 @@ class LVar(LInt):
             case Call(func=Name(id='print'), args=[Expr(expr=e)]):
                 new_instrs, arg1 = self.select_instructions_exp(e)
                 instrs.extend(new_instrs)
-                instrs.append(CallQ(NameQ("print"), arg1))
+                instrs.append(Move(arg1, Register("rdi")))
+                instrs.append(CallQ(NameQ("print_int"), None))
                 return instrs, None
             case _:
                 print("Expression not recognized")
@@ -194,6 +195,57 @@ class LVar(LInt):
                     print(type(s.name.id))
                     raise ValueError(f"Statement {s} not recognized!")
         return x86_instructions
+
+    def new_stack(self, id, stack_locations):
+        stack_counter = len(stack_locations.keys())
+        if id in stack_locations.keys():
+            return stack_locations[id], stack_locations
+        new_stack = StackLocation(Register("rbp"), -8 * (stack_counter + 1))
+        stack_locations[id] = new_stack
+        return (new_stack, stack_locations)
+
+    def assign_home(self, instruction, stack_locations):
+        match instruction:
+            case Move(arg1=NameQ(id=id1), arg2=NameQ(id=id2)):
+                ns1, stack_locations = self.new_stack(id1, stack_locations)
+                ns2, stack_locations = self.new_stack(id2, stack_locations)
+                return Move(arg1=ns1, arg2=ns2), stack_locations
+            case Move(arg1=a, arg2=NameQ(id=id)):
+                ns, stack_locations = self.new_stack(id, stack_locations)
+                return Move(arg1=a, arg2=ns), stack_locations
+            case Move(arg2=a, arg1=NameQ(id=id)):
+                ns, stack_locations = self.new_stack(id, stack_locations)
+                return Move(arg1=ns, arg2=a), stack_locations
+            case SubQ(arg1=a, arg2=NameQ(id=id)):
+                ns, stack_locations = self.new_stack(id, stack_locations)
+                return SubQ(arg1=a, arg2=ns), stack_locations
+            case AddQ(arg1=a, arg2=NameQ(id=id)):
+                ns, stack_locations = self.new_stack(id, stack_locations)
+                return AddQ(a, ns), stack_locations
+            case NegQ(arg1=NameQ(id=id)):
+                ns, stack_locations = self.new_stack(id, stack_locations)
+                return NegQ(ns), stack_locations
+            case CallQ(label=NameQ(id=id), i=i):
+                i, stack_locations = self.assign_home(i, stack_locations)
+                return CallQ(NameQ(id), i), stack_locations
+            case NameQ(id=id):
+                return self.new_stack(id, stack_locations)
+            case _:
+                print("Warning unknown instruction!")
+                print(instruction)
+        return (instruction, stack_locations)
+
+    def assign_homes(self, x86_var_inst):
+        # replace variable names with stack locations
+        # WE **could** use cpu registers but for simplicity we're using the stack
+        result = []
+        stack_locations = {}
+        for instruction in x86_var_inst:
+            new_instr, stack_locations = self.assign_home(
+                instruction, stack_locations
+            )
+            result.append(new_instr)
+        return result
 
     def compile(self, module):
         module = self.remove_complex_operands(module)
@@ -238,6 +290,10 @@ if __name__ == "__main__":
             validator = X86_var()
             is_valid = validator.is_valid(Program(x86_instrs))
             print(f"Valid x86_var: {is_valid}")
+            print("After assign_homes:")
+            x86_instrs = c.assign_homes(x86_instrs)
+            for instr in x86_instrs:
+                print(instr)
         except Exception as e:
             print(f"ERROR during select_instructions: {type(e).__name__}: {e}")
 

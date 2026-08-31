@@ -1,7 +1,7 @@
 
 .globl main
 main:
-    movq $12, %rdi
-    callq print_int
-    movq $0, %rax
-    retq
+  movq $42, -8(%rbp)
+  negq -8(%rbp)
+  movq -8(%rbp), %rdi
+  callq print_int

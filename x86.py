@@ -86,10 +86,12 @@ class Pop:
 class CallQ:
     def __init__(self, label, i):
         self.label = label
-        self.integer = i
+        self.i = i
 
     def __str__(self):
-        return f"callq {self.label} {self.integer}"
+        if self.i is None:
+            return f"callq {self.label}"
+        return f"callq {self.label} {self.i}"
 
     __repr__ = __str__
 
@@ -133,7 +135,7 @@ class Immediate:
     __repr__ = __str__
 
 
-class Deref:
+class StackLocation:
     def __init__(self, register, value):
         self.register = register
         self.value = value
@@ -164,7 +166,7 @@ class X86_int:
                 return True
             case Register(name=name):
                 return self._is_reg(name)
-            case Deref(register=reg, value=_):
+            case StackLocation(register=reg, value=_):
                 return self._is_reg(reg.name)
             case _:
                 return False
@@ -261,7 +263,7 @@ if __name__ == '__main__':
              prog4_int, x86_int_validator)
 
     prog5_int = Program([
-        Move(Immediate(42), Deref(Register("rbp"), -8)),
+        Move(Immediate(42), StackLocation(Register("rbp"), -8)),
         Ret()
     ])
     run_test("x86_int Test 5: movq $42, -8(%rbp); retq",
