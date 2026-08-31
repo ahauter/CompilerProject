@@ -1,8 +1,12 @@
 from Lint import (
     LInt, Module, Expr, Name, BinOp,
-    Add, Sub, Mul, Div, Constant, UnOp, USub, Call
+    Add, Sub, Constant, UnOp, USub, Call
 )
-from x86 import *
+from x86 import (
+    AddQ, SubQ, NegQ, Move, CallQ,
+    Register, Immediate, StackLocation,
+    NameQ, Program, X86_var
+)
 
 
 class Assignment:
@@ -63,10 +67,10 @@ class LVar(LInt):
                 new_l = child1
                 new_r = child2
                 if len(l) > 0:
-                    new_l = Name(l[-1].name)
+                    new_l = l[-1].name
                     new_statements.extend(l)
                 if len(r) > 0:
-                    new_r = Name(r[-1].name)
+                    new_r = r[-1].name
                     new_statements.extend(r)
                 new_stmt = BinOp(new_l, op, new_r)
                 if need_atomic:
@@ -80,7 +84,7 @@ class LVar(LInt):
                 new_cnst = const
                 if len(constant) > 0:
                     new_statements.extend(constant)
-                    new_cnst = Name(constant[-1].name)
+                    new_cnst = constant[-1].name
                 new_stmt = UnOp(USub(), new_cnst)
                 new_statements.append(new_stmt)
                 return new_statements
@@ -197,6 +201,9 @@ class LVar(LInt):
         return x86_instructions
 
     def new_stack(self, id, stack_locations):
+        if type(id) is not str:
+            print(f"id {id} is of type {type(id)}")
+            raise ValueError("Unknown type for id")
         stack_counter = len(stack_locations.keys())
         if id in stack_locations.keys():
             return stack_locations[id], stack_locations
@@ -230,6 +237,8 @@ class LVar(LInt):
                 return CallQ(NameQ(id), i), stack_locations
             case NameQ(id=id):
                 return self.new_stack(id, stack_locations)
+            case None:
+                return None, stack_locations
             case _:
                 print("Warning unknown instruction!")
                 print(instruction)
@@ -246,6 +255,21 @@ class LVar(LInt):
             )
             result.append(new_instr)
         return result
+
+    def patch_instructions(self, x86_in_instr):
+        results = []
+        for instr in x86_in_instr:
+            match instr:
+                case Move(arg1=StackLocation(register=r, value=v), arg2=StackLocation(register=r2, value=v2)):
+                    # patch direct moves from one stack location to another with intermediate register
+                    s1 = StackLocation(r, v)
+                    s2 = StackLocation(r2, v2)
+                    intermediate_register = Register("rax")
+                    results.append(Move(s1, intermediate_register))
+                    results.append(Move(intermediate_register, s2))
+                case _:
+                    results.append(instr)
+        return results
 
     def compile(self, module):
         module = self.remove_complex_operands(module)
@@ -292,6 +316,10 @@ if __name__ == "__main__":
             print(f"Valid x86_var: {is_valid}")
             print("After assign_homes:")
             x86_instrs = c.assign_homes(x86_instrs)
+            for instr in x86_instrs:
+                print(instr)
+            print("\nAfter Compile:")
+            x86_instrs = c.patch_instructions(x86_instrs)
             for instr in x86_instrs:
                 print(instr)
         except Exception as e:

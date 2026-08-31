@@ -203,6 +203,9 @@ class X86_int:
 
 class NameQ:
     def __init__(self, id):
+        if type(id) is not str:
+            print(f"id {id} is invalid type of {type(id)}")
+            raise ValueError("Invalid id provided")
         self.id = id
 
     def __str__(self):
