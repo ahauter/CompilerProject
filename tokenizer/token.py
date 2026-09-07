@@ -143,6 +143,8 @@ class TokenLoc():
             return f"{self.t} Start index: {self.s} End index: {self.e} Text: {self.text()}"
         return f"{self.t} Start index: {self.s} End index: {self.e}"
 
+    __repr__ = __str__
+
 
 def reduce(token_stream):
     token_stack = []

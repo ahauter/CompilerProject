@@ -1,6 +1,11 @@
 from tokenizer.token import Token, Number, CharacterSet, tokenize, TokenLoc
 
 
+class EndExpr:
+    def __repr__(self):
+        return "END EXPR"
+
+
 class NewLine(CharacterSet):
     def __init__(self):
         super().__init__("\n")
@@ -50,9 +55,16 @@ class UnOp:
     __repr__ = __str__
 
 
-class USub(Token):
+class USub():
     def __str__(self):
         return f"-"
+
+    __repr__ = __str__
+
+
+class Add(Token):
+    def __str__(self):
+        return f"+"
 
     __repr__ = __str__
 
@@ -60,12 +72,25 @@ class USub(Token):
         return c == self.__str__()
 
     def is_valid_token(self, s):
+        return s == self.__str__()
+
+
+class CParen(Token):
+    def __str__(self):
+        return f")"
+
+    __repr__ = __str__
+
+    def is_valid_subtoken(self, c):
         return c == self.__str__()
 
+    def is_valid_token(self, s):
+        return s == self.__str__()
 
-class Add(Token):
+
+class OParen(Token):
     def __str__(self):
-        return f"+"
+        return f"("
 
     __repr__ = __str__
 
@@ -121,6 +146,8 @@ class Call:
         self.args = args
 
     def __str__(self):
+        if self.args is None:
+            return f"{self.func}(NONE)"
         return f"{self.func}({', '.join(str(a) for a in self.args)})"
 
     __repr__ = __str__
@@ -128,14 +155,14 @@ class Call:
 
 class Identifier(CharacterSet):
     def __init__(self):
-        valid = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        valid = "_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
         super().__init__(*[v for v in valid])
 
     def __str__(self):
         return "Identifier"
 
 
-class Name(CharacterSet):
+class Name:
     def __init__(self, id):
         self.id = id
 
@@ -157,27 +184,108 @@ class Expr:
 
 class LInt():
     def tokens(self):
-        return [Add(), Sub(), Number(), Identifier(), NewLine()]
+        return [Add(), Sub(), Number(), Identifier(), NewLine(), OParen(), CParen()]
 
     def tokenize(self, corpus):
         return tokenize(corpus, self.tokens())
 
     def full_reduce(self, token_stream):
         result = Module([])
-        token_stack = [None]
+        tree = [None]
+        token_stack = []
         for next_token in token_stream:
-            result, token_stack = self.reduce(result, token_stack, next_token)
-        match token_stack:
-            case [Expr()]:
-                result.body.append(token_stack[0])
+            token_stack.append(next_token)
+            tree, token_stack = self.reduce_tree(tree, token_stack)
+        match tree:
+            case [Expr() as expr]:
+                result.body.append(expr)
         return result
 
-    def reduce(self, result, token_stack, next_token):
-        token_stack.append(next_token)
+    def reduce_expressions(self, tree):
+        if len(tree) < 2:
+            return tree
+        match tree:
+            case [*_, Call(args=None) as c, EndExpr()]:
+                c.args = []
+                tree[-2:] = [Expr(c)]
+            case [*_, BinOp(right=None) as b, Expr() as e]:
+                b.right = e
+                tree[-2:] = [Expr(b)]
+            case [*_, Call(args=None) as c, Expr() as e, EndExpr()]:
+                c.args = [e]
+                tree[-3:] = [Expr(c)]
+            case _:
+                pass
+        return tree
+
+    def reduce_tree(self, tree, token_stack):
+        print(f"TREE: {tree}")
+        print(f"STACK: {token_stack}")
+        match (tree.pop(), token_stack):
+            case (None, [TokenLoc(t=Number())]):
+                value = token_stack[-1].text()
+                tree.append(Expr(Constant(int(value))))
+                token_stack = []
+            case (Expr() as left, [TokenLoc(t=CParen())]):
+                token_stack = []
+                tree.append(left)
+                tree.append(EndExpr())
+            case (None, [TokenLoc(t=CParen())]):
+                token_stack = []
+                tree.append(EndExpr())
+            case (None, [TokenLoc(t=Identifier()) as id, TokenLoc(t=OParen())]):
+                tree.append(Call(func=Name(id=id.text()), args=None))
+                tree.append(None)
+                token_stack = []
+            case (Expr() as left, [TokenLoc(t=Add())]):
+                expr = BinOp(left, Add(), None)
+                tree.append(expr)
+                tree.append(None)
+                token_stack = []
+            case (Expr() as left, [TokenLoc(t=Sub())]):
+                expr = BinOp(left, Sub(), None)
+                tree.append(expr)
+                tree.append(None)
+                token_stack = []
+            case (_ as te, _ as tok):
+                print(f"Unmatched values: {type(te)}, {tok}")
+                tree.append(te)
+
+        tree = self.reduce_expressions(tree)
+        return tree, token_stack
+
+    def reduce(self, token_stack):
+        print("NEW TOKEN")
+        print(token_stack)
         match token_stack:
             case [None, TokenLoc(t=Number())]:
                 value = token_stack[-1].text()
                 token_stack = [Expr(Constant(int(value)))]
+            case [Call(func=Name(id=id), args=None), TokenLoc(t=CParen())]:
+                print("I am here :))")
+                token_stack = [Expr(Call(Name(id), []))]
+            case [None, TokenLoc(t=Identifier()) as id, TokenLoc(t=OParen()), *rst]:
+                print("I am here :)")
+                tmp_token_stack = self.reduce([None, *rst])
+                print(f"TMP after interior function parsing {tmp_token_stack}")
+                expr = tmp_token_stack[0]
+                if type(expr) is Expr:
+                    tmp_token_stack[0] = Expr(Call(Name(id.text()), [expr]))
+                    token_stack = tmp_token_stack
+                else:
+                    tmp_token_stack[0] = Call(Name(id.text()), None)
+                    token_stack = [tmp_token_stack[0], *rst]
+            case [Call(func=Name(id=id), args=None),  *rst]:
+                print("I am heres :)")
+                tmp_token_stack = self.reduce([None, *rst])
+                expr = tmp_token_stack[0]
+                print(f"TMP after interior function parsing {tmp_token_stack}")
+                if type(expr) is Expr:
+                    tmp_token_stack[0] = Expr(Call(Name(id), [expr]))
+                    token_stack = tmp_token_stack
+                else:
+                    tmp_token_stack[0] = Call(Name(id), None)
+                    token_stack = [tmp_token_stack[0], *rst]
             case [None, TokenLoc(t=Sub())]:
                 token_stack = [UnOp(Sub(), None)]
             case [UnOp(op=op, right=None), TokenLoc(t=Number())]:
@@ -205,13 +313,15 @@ class LInt():
                 next_token = token_stack[1]
                 num = int(next_token.text())
                 bo.right = UnOp(op=op, right=num)
-            case [Expr(), NewLine()]:
+            case [Expr() as expr, TokenLoc(t=NewLine())]:
+                return [expr]
+            case [Expr(), TokenLoc(t=CParen())]:
                 expr = token_stack[0]
                 token_stack = [None]
-                result.body.append(expr)
+                return [expr]
             case _:
                 pass
-        return result, token_stack
+        return token_stack
 
     def parse(self, corpus):
         return self.full_reduce(self.tokenize(corpus))
@@ -256,6 +366,8 @@ class LInt():
                 return False
 
     def interp_exp(self, e):
+        if type(e) is Expr:
+            e = e.expr
         match e:
             case BinOp(left=child1, op=Add(), right=child2):
                 l = self.interp_exp(child1)
@@ -329,6 +441,8 @@ class LInt():
                 return BinOp(r1, Div(), r2)
 
     def pe_exp(self, e):
+        if type(e) is Expr:
+            e = e.expr
         match e:
             case BinOp(left=l1, op=Add(), right=r1):
                 return self.pe_add(self.pe_exp(l1), self.pe_exp(r1))
@@ -381,7 +495,9 @@ if __name__ == "__main__":
     # interp.interp(pe_prog1)
 
     c = "1234-123487"
-    corpus = "1234-123487+134702-1381234"
+    corpus = "print(input_int() + 1234-123487+134702-1381234)"
     for token in interp.tokenize(corpus):
         print(token)
-    print(interp.parse(corpus))
+    ast = interp.parse(corpus)
+    print(ast)
+    interp.interp(ast)
