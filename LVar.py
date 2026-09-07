@@ -7,6 +7,7 @@ from x86 import (
     Register, Immediate, StackLocation,
     NameQ, Program, X86_var
 )
+from tokenizer.token import CharacterSet
 
 
 class Assignment:
@@ -26,10 +27,35 @@ class Assignment:
     __repr__ = __str__
 
 
+class Equal(CharacterSet):
+    def __init__(self):
+        super().__init__("=")
+
+
 class LVar(LInt):
     def __init__(self):
         self.env = {}
         self.comp_env = {}
+
+    def tokens(self):
+        return super().tokens().extend([Equal()])
+
+    def reduce(self, result, token_stack):
+        pass
+
+    def full_reduce(self, token_stream):
+        result = Module([])
+        token_stack = [None]
+        for next_token in token_stream:
+            token_stack.append(next_token)
+            result, token_stack = self.reduce(
+                result, token_stack)
+        match token_stack:
+            case [Expr()]:
+                result.body.append(token_stack[0])
+            case [Assignment()]:
+                result.body.append(token_stack[0])
+        return result
 
     def get_id(self):
         cur_id = "cur_id"

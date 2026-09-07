@@ -1,6 +1,15 @@
+from tokenizer.token import Token, Number, CharacterSet, tokenize, TokenLoc
+
+
+class NewLine(CharacterSet):
+    def __init__(self):
+        super().__init__("\n")
+
+
 class Constant:
     def __init__(self, value):
         self.value = value
+        super().__init__()
 
     def __str__(self):
         return f"{self.value}"
@@ -41,39 +50,69 @@ class UnOp:
     __repr__ = __str__
 
 
-class USub:
+class USub(Token):
     def __str__(self):
         return f"-"
 
     __repr__ = __str__
 
+    def is_valid_subtoken(self, c):
+        return c == self.__str__()
 
-class Add:
+    def is_valid_token(self, s):
+        return c == self.__str__()
+
+
+class Add(Token):
     def __str__(self):
         return f"+"
 
     __repr__ = __str__
 
+    def is_valid_subtoken(self, c):
+        return c == self.__str__()
 
-class Sub:
+    def is_valid_token(self, s):
+        return s == self.__str__()
+
+
+class Sub(Token):
     def __str__(self):
         return f"-"
 
     __repr__ = __str__
 
+    def is_valid_subtoken(self, c):
+        return c == self.__str__()
 
-class Mul:
+    def is_valid_token(self, s):
+        return s == self.__str__()
+
+
+class Mul(Token):
     def __str__(self):
         return f"*"
 
     __repr__ = __str__
 
+    def is_valid_subtoken(self, c):
+        return c == self.__str__()
 
-class Div:
+    def is_valid_token(self, s):
+        return s == self.__str__()
+
+
+class Div(Token):
     def __str__(self):
         return f"/"
 
     __repr__ = __str__
+
+    def is_valid_subtoken(self, c):
+        return c == self.__str__()
+
+    def is_valid_token(self, s):
+        return s == self.__str__()
 
 
 class Call:
@@ -87,7 +126,16 @@ class Call:
     __repr__ = __str__
 
 
-class Name:
+class Identifier(CharacterSet):
+    def __init__(self):
+        valid = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        super().__init__(*[v for v in valid])
+
+    def __str__(self):
+        return "Identifier"
+
+
+class Name(CharacterSet):
     def __init__(self, id):
         self.id = id
 
@@ -108,6 +156,66 @@ class Expr:
 
 
 class LInt():
+    def tokens(self):
+        return [Add(), Sub(), Number(), Identifier(), NewLine()]
+
+    def tokenize(self, corpus):
+        return tokenize(corpus, self.tokens())
+
+    def full_reduce(self, token_stream):
+        result = Module([])
+        token_stack = [None]
+        for next_token in token_stream:
+            result, token_stack = self.reduce(result, token_stack, next_token)
+        match token_stack:
+            case [Expr()]:
+                result.body.append(token_stack[0])
+        return result
+
+    def reduce(self, result, token_stack, next_token):
+        token_stack.append(next_token)
+        match token_stack:
+            case [None, TokenLoc(t=Number())]:
+                value = token_stack[-1].text()
+                token_stack = [Expr(Constant(int(value)))]
+            case [None, TokenLoc(t=Sub())]:
+                token_stack = [UnOp(Sub(), None)]
+            case [UnOp(op=op, right=None), TokenLoc(t=Number())]:
+                value = int(token_stack[-1].text())
+                token_stack = [Expr(UnOp(op=op, right=Constant(value)))]
+            case [Expr(), TokenLoc(t=Add())]:
+                token_stack = [
+                    BinOp(left=token_stack[0], op=Add(), right=None)
+                ]
+            case [Expr(), TokenLoc(t=Sub())]:
+                token_stack = [
+                    BinOp(left=token_stack[0], op=Sub(), right=None)
+                ]
+            case [BinOp(right=None), TokenLoc(t=Number())]:
+                bo = token_stack[0]
+                next_token = token_stack[1]
+                bo.right = Expr(Constant(value=int(next_token.text())))
+                token_stack = [Expr(bo)]
+            case [BinOp(right=None), TokenLoc(t=Sub())]:
+                bo = token_stack[0]
+                bo.right = UnOp(op=USub(), right=None)
+                token_stack = [bo]
+            case [BinOp(right=UnOp(op=op, right=None)), TokenLoc(t=Number())]:
+                bo = token_stack[0]
+                next_token = token_stack[1]
+                num = int(next_token.text())
+                bo.right = UnOp(op=op, right=num)
+            case [Expr(), NewLine()]:
+                expr = token_stack[0]
+                token_stack = [None]
+                result.body.append(expr)
+            case _:
+                pass
+        return result, token_stack
+
+    def parse(self, corpus):
+        return self.full_reduce(self.tokenize(corpus))
+
     def is_exp(self, line: str):
         match line:
             case BinOp(left=child1, op=Add(), right=child2):
@@ -268,6 +376,12 @@ if __name__ == "__main__":
     print(interp.is_Lint(prog3))
     pe_prog1 = interp.pe_P_int(prog3)
     # pe_prog2 = pe_P_int(print_prog(prog2))
-    interp.interp(print_prog(prog1))
+    # interp.interp(print_prog(prog1))
     # print(pe_prog1.body[0].expr.args[0].expr)
-    interp.interp(pe_prog1)
+    # interp.interp(pe_prog1)
+
+    c = "1234-123487"
+    corpus = "1234-123487+134702-1381234"
+    for token in interp.tokenize(corpus):
+        print(token)
+    print(interp.parse(corpus))
