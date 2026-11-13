@@ -276,9 +276,68 @@ class LVar(LInt):
                 print(instruction)
         return (instruction, stack_locations)
 
+    def get_used_variables(self, instruction):
+        written = set()
+        read = set()
+        match instruction:
+            case Move(arg1=NameQ(id=id1), arg2=NameQ(id=id2)):
+                read.add(id1)
+                written.add(id2)
+            case Move(arg1=a, arg2=NameQ(id=id)):
+                written.add(id)
+            case Move(arg2=a, arg1=NameQ(id=id)):
+                read.add(id)
+            case SubQ(arg1=NameQ(id=id1), arg2=NameQ(id=id2)):
+                written.add(id2)
+                read.add(id1)
+                read.add(id2)
+            case SubQ(arg1=a, arg2=NameQ(id=id)):
+                written.add(id)
+                read.add(id)
+            case AddQ(arg1=NameQ(id=id1), arg2=NameQ(id=id2)):
+                written.add(id2)
+                read.add(id1)
+                read.add(id2)
+            case AddQ(arg1=a, arg2=NameQ(id=id)):
+                written.add(id)
+                read.add(id)
+            case NegQ(arg1=NameQ(id=id)):
+                written.add(id)
+                read.add(id)
+            case CallQ(label=NameQ(id=id), i=None):
+                pass
+            case CallQ(label=NameQ(id=id), i=i):
+                read.add(i)
+            ## IDK why NAME Q is here maybe remove
+            case NameQ(id=id):
+                written.add(id)
+            case _:
+                print("Warning unknown instruction!")
+                print(instruction)
+        return written, read
+        
+    def uncover_live(self, instructions): 
+        print(f"UNCOVER LIVE => {instructions}")
+        l_after = set()
+        result = []
+        for instr in instructions[::-1]:
+            print(f"UNCOVER LIVE => {instr}")
+            written, read = self.get_used_variables(instr)
+            print(f"Written: {written}")
+            print(f"Read: {read}")
+            l_before = (l_after.difference(written))
+            l_before = l_before.union(read)
+            result.append((l_before, l_after))
+            l_after = l_before
+        result = result[::-1]
+        return result
+            
+        
     def assign_homes(self, x86_var_inst):
         # replace variable names with stack locations
-        # WE **could** use cpu registers but for simplicity we're using the stack
+        liveliness = self.uncover_live(x86_var_inst) 
+        for l in liveliness:
+            print(l)
         result = []
         stack_locations = {}
         for instruction in x86_var_inst:
@@ -394,3 +453,13 @@ if __name__ == "__main__":
         ]))
     ])
     run_test("Test 5: print(-42)", test5)
+    
+    # Test 6: adding two variables
+    test5 = Module([
+        Assignment(Name("a"), Expr(Constant(10))),
+        Assignment(Name("b"), Expr(Constant(10))),
+        Assignment(Name("c"), Expr(Name("a"))),
+        Assignment(Name("b"), Expr(Constant(11))),
+        Assignment(Name("c"), Expr(BinOp(Name("b"), Sub(), Name("c")))),
+    ])
+    run_test("Test 5: a = 10; b = 10; c = a; b = 11; c = b + c", test5)
