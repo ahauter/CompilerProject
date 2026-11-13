@@ -116,6 +116,9 @@ class LVar(LInt):
                 return new_statements
             case Call(func=Name(id='input_int'), args=[]):
                 return []
+            case _: 
+                print(f"Warning could not figure out this statement: {exp}")
+                return []
 
     def remove_complex_operands(self, module: Module):
         new_module = []
@@ -214,10 +217,13 @@ class LVar(LInt):
         x86_instructions = []
         for s in module.body:
             match s:
+                case Assignment(name=Name(id=id), expr=Expr(expr=Constant(value=value))):
+                    x86_instructions.append(Move(Immediate(value), NameQ(id)))
                 case Assignment(name=Name(id=id), expr=Expr(expr=e)):
                     exp_instructions, arg1 = self.select_instructions_exp(e)
                     x86_instructions.extend(exp_instructions)
-                    x86_instructions.append(Move(arg1, NameQ(id)))
+                    if not (type(arg1) is NameQ and arg1.id == id):
+                        x86_instructions.append(Move(arg1, NameQ(id)))
                 case Expr(expr=e):
                     exp_instructions, arg1 = self.select_instructions_exp(e)
                     x86_instructions.extend(exp_instructions)
